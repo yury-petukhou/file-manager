@@ -1,0 +1,13 @@
+{
+    "name": "file-manager",
+    "version": "1.0.0",
+    "description": "file manager for RS ",
+    "main": "index.js",
+    "type":"module",
+    "scripts": {
+      "start": "node index.js"
+    },
+    "dependencies": {
+      "yargs": "^17.7.2"
+    }
+  }

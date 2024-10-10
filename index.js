@@ -1,7 +1,7 @@
-import {getArgumentValue, println} from './utils/index.js';
+import {getArgumentValue, println, expandTildePath} from './utils/index.js';
 import os from 'os';
 import readline from 'readline';
-import { promises as fs } from 'fs';
+import  fs  from 'fs';
 
 
 const rl = readline.createInterface({
@@ -10,7 +10,6 @@ const rl = readline.createInterface({
   });
 
 const  goToDir = (path) => {
-    console.log(path, '<--- path')
     process.chdir(path);
 } 
 
@@ -19,17 +18,48 @@ const printInfo = (files) => `| (index) |      Name       |   Type    |
 ${files.map(({index, name, type}) => println(`|${index.toString().padStart(5).padEnd(9)}|${name.padStart(14).padEnd(19)}|${type.padStart(5).padEnd(5)}|`)).join('')}`
 
 
+class FilesMethodes {
+    constructor(){}
+
+     cat(path){
+        const readStream = fs.createReadStream(path, 'utf8');
+        let str = '';
+
+        readStream.on('data', (chunk) => {
+            str+=chunk
+        });
+
+        readStream.on('end', () => {
+            process.stdout.write(println(str))
+        });
+
+        readStream.on('error', (error) => {
+             console.error('Somthing went wrong:', error);
+        });
+        
+    }
+}
+
 class FileManager {
 
     constructor() {
         this.userName = ''
+        
+        this.filesMethodes = new FilesMethodes()
+        this.methods = {
+            up: this.up,
+            cd: this.cd,
+            ls: this.ls,
+            cat: this.filesMethodes.cat
+        }
     }
+
     up(){
         goToDir('..');
     }
 
     cd(pathParam){
-        const path = pathParam.replace('cd', '')
+        const path = expandTildePath(pathParam);
         goToDir(path)
     }
 
@@ -49,6 +79,7 @@ class FileManager {
             console.log(e)
         }
     }
+
     init(){
         this.userName = getArgumentValue('--username')
         process.stdout.write(println(`Welcome to the File Manager, ${this.userName}!`))
@@ -59,24 +90,15 @@ class FileManager {
             process.stdout.write(println(`You are currently in ${process.cwd()}`))
     
             rl.question(println('Please print command or .exit or cntr+c for exit'), (input) => {
-                const inpt = input.toLowerCase()
-                if(inpt === '.exit') {
+                const [cmd, param] =  input.split(' ')
+                console.log(cmd, param)
+                if(cmd.toLowerCase() === '.exit') {
                     process.stdout.write(println(`Thank you for using File Manager, ${this.userName}, goodbye!`));
                     rl.close();
                     process.exit(0);
                 } 
 
-                if(inpt === 'up') {
-                    this.up()
-                }
-
-                if(inpt.startsWith("cd")) {
-                    this.cd(inpt)
-                }
-                if(inpt === 'ls') {
-                    this.ls()
-                }
-              
+                this.methods[cmd.toLowerCase()](param)
                 promt();
             })
         }

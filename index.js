@@ -1,8 +1,10 @@
 import {getArgumentValue, println, expandTildePath} from './utils/index.js';
+import { pipeline } from 'stream/promises';
 import os from 'os';
 import readline from 'readline';
-import  fs  from 'fs';
-
+import  fs  from 'fs/promises';
+import fsCallback from 'fs';
+import path from 'path'
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -22,7 +24,7 @@ class FilesMethodes {
     constructor(){}
 
      cat(path){
-        const readStream = fs.createReadStream(path, 'utf8');
+        const readStream = fsCallback.createReadStream(path, 'utf8');
         let str = '';
 
         readStream.on('data', (chunk) => {
@@ -38,6 +40,64 @@ class FilesMethodes {
         });
         
     }
+
+    async rn(from, to){
+      
+        try {
+            await fs.rename(from, to[0])
+            console.log(`${from} is renamed ${to}`)
+        } catch (error) {
+            console.log(`Cant rename file from ${from} to ${to}`)
+        }
+    }
+
+    async cp(source, dist){
+ 
+        const readStream = fsCallback.createReadStream(source);
+        const writeStream = fsCallback.createWriteStream(dist[0]);
+
+        try {
+            await pipeline(readStream, writeStream);
+        } catch (error) {
+            console.log(`Cant copy file`, error)
+        }
+        
+    }
+
+    rm(filepath){
+        fsCallback.unlink(filepath, (err) => {
+            if (err) {
+                if (err.code === 'ENOENT') {
+                    console.error(`File not found: ${filePath}`);
+                } else {
+                    console.error(`Error deleting file ${filePath}:`, err);
+                }
+                 
+            } else {
+                console.log(`File deleted successfully: ${filePath}`);
+           
+            }
+        });
+    }
+
+    async mv(source, distParam){
+        const dist = distParam[0]
+         
+        try {
+
+            await fs.access(source);
+            await fs.access(dist);
+
+            const fileName = path.basename(source);
+            const destinationPath = path.join(dist, fileName);
+            await fs.rename(source, destinationPath);
+            
+            console.log(`File moved successfully from ${source} to ${dist}`);
+        } catch (error) {
+            console.log(`cant be moved from ${source} to ${dist}`,error)
+        }
+       
+    }
 }
 
 class FileManager {
@@ -50,7 +110,10 @@ class FileManager {
             up: this.up,
             cd: this.cd,
             ls: this.ls,
-            cat: this.filesMethodes.cat
+            cat: this.filesMethodes.cat,
+            rn: this.filesMethodes.rn,
+            cp: this.filesMethodes.cp,
+            mv: this.filesMethodes.mv
         }
     }
 
@@ -58,14 +121,15 @@ class FileManager {
         goToDir('..');
     }
 
-    cd(pathParam){
+    async cd(pathParam){
+        console.log(pathParam)
         const path = expandTildePath(pathParam);
-        goToDir(path)
+        await goToDir(path)
     }
 
     async ls(){
         try{
-            const directoryOrFilePath = process.cwd();
+            const directoryOrFilePath =  process.cwd();
             const files = await fs.readdir(directoryOrFilePath);
             const stat = await fs.stat(directoryOrFilePath)
             const mappedFiles = files.map((file,index) => ({
@@ -90,15 +154,17 @@ class FileManager {
             process.stdout.write(println(`You are currently in ${process.cwd()}`))
     
             rl.question(println('Please print command or .exit or cntr+c for exit'), (input) => {
-                const [cmd, param] =  input.split(' ')
-                console.log(cmd, param)
+                const [cmd, param,  ...rest] =  input.split(' ');
                 if(cmd.toLowerCase() === '.exit') {
                     process.stdout.write(println(`Thank you for using File Manager, ${this.userName}, goodbye!`));
                     rl.close();
                     process.exit(0);
                 } 
 
-                this.methods[cmd.toLowerCase()](param)
+                const f = async () => {
+                   await this.methods[cmd.toLowerCase()](param, rest)
+                }
+                this.methods[cmd.toLowerCase()] && f()
                 promt();
             })
         }
